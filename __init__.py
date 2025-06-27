@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from database import Database
 
 class InventoryApp:
     def __init__(self, root, inventory):
@@ -8,12 +9,12 @@ class InventoryApp:
         self.root.title("Inventory System")
         self.root.geometry("700x500")
 
-        #allowing the table and window to stretch when resizing
+        #Allow the window and table areea to expand when resized
         self.root.grid_rowconfigure(4, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=1)
 
-        # innput fields
+        # input fields
         tk.Label(self.root, text="Product Name:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
         self.entry_name = tk.Entry(self.root)
         self.entry_name.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
@@ -26,11 +27,11 @@ class InventoryApp:
         self.entry_price = tk.Entry(self.root)
         self.entry_price.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
 
-        # add button
-        btn_add = tk.Button(self.root, text="Add Products", command=self.add_item)
+        # button to add a product
+        btn_add = tk.Button(self.root, text="Add Product", command=self.add_item)
         btn_add.grid(row=3, column=0, columnspan=2, pady=10)
 
-        # scrollablee table
+        # framet for thte scrollable table
         frame = tk.Frame(self.root)
         frame.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
@@ -52,38 +53,12 @@ class InventoryApp:
 
         scrollbar.config(command=self.tree.yview)
 
-        if hasattr(self, 'refresh_table'):
-            self.refresh_table()
-        else:
-            print("⚠️ Attention: refresh_table() method not found")
-
-        
-         #product deletion button
-        btn_delete = tk.Button(self.root, text="Delete the selected product", command=self.delete_selected_item)
+        #button to delete selected product
+        btn_delete = tk.Button(self.root, text="Delete Selected Product", command=self.delete_selected_item)
         btn_delete.grid(row=5, column=0, columnspan=2, pady=10)
 
-    def delete_selected_item(self):
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("Attention", "Select the item to delete.")
-            return
-
-        confirm = messagebox.askyesno("Confirmation", "Delete the seleected product?")
-        if not confirm:
-            return
-
-        item_id = self.tree.item(selected[0])["values"][0]
-        try:
-            self.inventory.delete_item(item_id)
-            self.refresh_table()
-            messagebox.showinfo("Success", "The product has been deleted.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Couldn't delete the product: {e}")
-
-    def clear_fields(self):
-        self.entry_name.delete(0, tk.END)
-        self.entry_quantity.delete(0, tk.END)
-        self.entry_price.delete(0, tk.END)
+        #load product data on startup
+        self.refresh_table()
 
     def add_item(self):
         name = self.entry_name.get().strip()
@@ -101,7 +76,7 @@ class InventoryApp:
                 messagebox.showerror("Error", "Quantity and price cannot be negative.")
                 return
         except ValueError:
-            messagebox.showerror("Error", "The quantity must be an integer, and the price must be a number.")
+            messagebox.showerror("Error", "Quantity must be an integer and price must be a number.")
             return
 
         try:
@@ -110,15 +85,42 @@ class InventoryApp:
             self.clear_fields()
             messagebox.showinfo("Success", "Product added successfully.")
         except Exception as e:
-            messagebox.showerror("Error", f"Couldn't add product: {e}")
+            messagebox.showerror("Error", f"Failed to add product: {e}")
 
+    def delete_selected_item(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a product to delete.")
+            return
 
+        confirm = messagebox.askyesno("Confirmation", "Are you sure you want to delete the selected product?")
+        if not confirm:
+            return
 
-    # method of updating the table
+        item_id = self.tree.item(selected[0])["values"][0]
+        try:
+            self.inventory.delete_item(item_id)
+            self.refresh_table()
+            messagebox.showinfo("Success", "Product deleted successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete product: {e}")
+
+    def clear_fields(self):
+        self.entry_name.delete(0, tk.END)
+        self.entry_quantity.delete(0, tk.END)
+        self.entry_price.delete(0, tk.END)
+
     def refresh_table(self):
         for row in self.tree.get_children():
             self.tree.delete(row)
         for item in self.inventory.get_all_items():
             self.tree.insert("", "end", values=item)
+
+#optional direct launnnch
+if __name__ == "__main__":
+    root = tk.Tk()
+    db = Database("inventory.db")
+    app = InventoryApp(root, db)
+    root.mainloop()
 
 
