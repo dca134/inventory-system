@@ -1,207 +1,113 @@
-import os
-os.environ['TK_SILENCE_DEPRECATION'] = '1'
 import tkinter as tk
 from tkinter import ttk, messagebox
-from ttkthemes import ThemedStyle
 from database import Database
 
 class InventoryApp:
-    def __init__(self, root):
+    def __init__(self, root, inventory):
         self.root = root
-        self.db = Database()
-        self.selected_item = None
-        self.setup_ui()
+        self.inventory = inventory
+        self.root.title("Inventory System")
+        self.root.geometry("700x500")
 
-    def setup_ui(self):
-        self.root.title("Инвентарная система v2.0")
-        self.root.geometry("1000x700")
+        # stretchable table
+        self.root.grid_rowconfigure(4, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=1)
 
-        style = ThemedStyle(self.root)
-        style.set_theme("arc")
+        #  input fields
+        tk.Label(root, text="Product Name:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        self.entry_name = tk.Entry(root)
+        self.entry_name.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
-        self.create_tabs()
-        self.load_data()
+        tk.Label(root, text="Quantity:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        self.entry_quantity = tk.Entry(root)
+        self.entry_quantity.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
 
-    def create_tabs(self):
-        self.tab_control = ttk.Notebook(self.root)
+        tk.Label(root, text="Price:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        self.entry_price = tk.Entry(root)
+        self.entry_price.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
 
-        self.tab_view = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.tab_view, text="Все товары")
-        self.setup_view_tab()
+        # add button
+        btn_add = tk.Button(root, text="Add Products", command=self.add_item)
+        btn_add.grid(row=3, column=0, columnspan=2, pady=10)
 
-        self.tab_edit = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.tab_edit, text="Добавить/Изменить")
-        self.setup_edit_tab()
+        # scrollablee table
+        frame = tk.Frame(root)
+        frame.grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
-        self.tab_control.pack(expand=1, fill="both")
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-    def setup_view_tab(self):
-        container = ttk.Frame(self.tab_view)
-        container.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(frame, columns=("ID", "Product Name", "Quantity", "Price"), show="headings", yscrollcommand=scrollbar.set)
+        self.tree.heading("ID", text="ID")
+        self.tree.heading("Название", text="Название")
+        self.tree.heading("Quantity", text="Quantity")
+        self.tree.heading("Price", text="Price")
+        self.tree.pack(fill=tk.BOTH, expand=True)
 
-        self.tree = ttk.Treeview(
-            container,
-            columns=("ID", "Название", "Количество", "Цена"),
-            show="headings",
-            selectmode="browse"
-        )
+        scrollbar.config(command=self.tree.yview)
 
-        vsb = ttk.Scrollbar(container, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(container, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
-
-        columns = {
-            "ID": {"width": 50, "anchor": "w"},
-            "Название": {"width": 200, "anchor": "w"},
-            "Количество": {"width": 100, "anchor": "center"},
-            "Цена": {"width": 100, "anchor": "e"}
-        }
-
-        for col, params in columns.items():
-            self.tree.heading(col, text=col)
-            self.tree.column(col, **params)
-
-        self.setup_view_buttons()
-
-        container.grid_columnconfigure(0, weight=1)
-        container.grid_rowconfigure(0, weight=1)
-
-    def setup_view_buttons(self):
-        btn_frame = ttk.Frame(self.tab_view)
-        btn_frame.pack(pady=10)
-
-        buttons = [
-            ("Обновить", self.load_data),
-            ("Изменить", self.edit_selected),
-            ("Удалить", self.delete_selected)
-        ]
-
-        for text, command in buttons:
-            ttk.Button(btn_frame, text=text, command=command).pack(side="left", padx=5)
-
-    def setup_edit_tab(self):
-        fields = [
-            ("Название:", "entry_name"),
-            ("Количество:", "entry_quantity"),
-            ("Цена:", "entry_price")
-        ]
-
-        for row, (label_text, attr_name) in enumerate(fields):
-            ttk.Label(self.tab_edit, text=label_text).grid(row=row, column=0, padx=5, pady=5, sticky="e")
-            entry = ttk.Entry(self.tab_edit)
-            entry.grid(row=row, column=1, padx=5, pady=5, sticky="w")
-            setattr(self, attr_name, entry)
-
-        # Добавляем скрытое поле для ID
-        self.entry_id = ttk.Entry(self.tab_edit)
-        self.entry_id.grid_forget()
-
-        self.setup_edit_buttons()
-
-    def setup_edit_buttons(self):
-        btn_frame = ttk.Frame(self.tab_edit)
-        btn_frame.grid(row=3, columnspan=2, pady=10)
-
-        buttons = [
-            ("Добавить", self.add_item),
-            ("Обновить", self.update_item),
-            ("Очистить", self.clear_form)
-        ]
-
-        for text, command in buttons:
-            ttk.Button(btn_frame, text=text, command=command).pack(side="left", padx=5)
-
-    def load_data(self):
-        for row in self.tree.get_children():
-            self.tree.delete(row)
-
-        items = self.db.get_all_items()
-        for item in items:
-            self.tree.insert("", "end", values=item)
+        self.refresh_table()
 
     def add_item(self):
-        name = self.entry_name.get()
-        quantity = self.entry_quantity.get()
-        price = self.entry_price.get()
+        name = self.entry_name.get().strip()
+        quantity_str = self.entry_quantity.get().strip()
+        price_str = self.entry_price.get().strip()
 
-        if not name or not quantity or not price:
-            messagebox.showerror("Ошибка", "Все поля должны быть заполнены.")
+        if not name or not quantity_str or not price_str:
+            messagebox.showerror("Error", "Please fill in all fields.")
             return
 
-        self.db.add_item(name, int(quantity), float(price))
-        self.load_data()
-        self.clear_form()
-
-    def edit_selected(self):
-        selected = self.tree.focus()
-        if not selected:
-            messagebox.showwarning("Выбор", "Выберите товар для редактирования.")
+        try:
+            quantity = int(quantity_str)
+            price = float(price_str)
+            if quantity < 0 or price < 0:
+                messagebox.showerror("Error", "Quantity and price cannnot be negative.")
+                return
+        except ValueError:
+            messagebox.showerror("Error", "The quantity must be an integer, and the price must be a number.")
             return
 
-        values = self.tree.item(selected, "values")
-        self.entry_id.delete(0, tk.END)
-        self.entry_id.insert(0, values[0])
-        self.entry_name.delete(0, tk.END)
-        self.entry_name.insert(0, values[1])
-        self.entry_quantity.delete(0, tk.END)
-        self.entry_quantity.insert(0, values[2])
-        self.entry_price.delete(0, tk.END)
-        self.entry_price.insert(0, values[3])
-        self.tab_control.select(self.tab_edit)
+        try:
+            self.inventory.add_item(name, quantity, price)
+            messagebox.showinfo("Success", "Product added successfully.")
+            self.refresh_table()
+            self.clear_fields()
+        except Exception as e:
+            messagebox.showerror("Error", f"Couldn't add product: {e}")
 
-    def update_item(self):
-        item_id = self.entry_id.get()
-        name = self.entry_name.get()
-        quantity = self.entry_quantity.get()
-        price = self.entry_price.get()
-
-        if not item_id or not name or not quantity or not price:
-            messagebox.showerror("Ошибка", "Все поля должны быть заполнены.")
-            return
-
-        self.db.update_item(int(item_id), name, int(quantity), float(price))
-        self.load_data()
-        self.clear_form()
-        self.tab_control.select(self.tab_view)
-
-    def delete_selected(self):
-        selected = self.tree.focus()
-        if not selected:
-            messagebox.showwarning("Выбор", "Выберите товар для удаления.")
-            return
-
-        item_id = self.tree.item(selected, "values")[0]
-        confirm = messagebox.askyesno("Подтверждение", "Вы уверены, что хотите удалить этот товар?")
-        if confirm:
-            self.db.delete_item(int(item_id))
-            self.load_data()
-
-    def clear_form(self):
-        self.entry_id.delete(0, tk.END)
+    def clear_fields(self):
         self.entry_name.delete(0, tk.END)
         self.entry_quantity.delete(0, tk.END)
         self.entry_price.delete(0, tk.END)
 
-    def __init__(self, root):
-        self.root = root
-        self.setup_styles()
-        # ... остальной код ...
-    
-    def setup_styles(self):
-        self.style = ThemedStyle(self.root)
-        self.style.set_theme("arc")
-        
-        # Кастомизация кнопок
-        self.style.configure('TButton', 
-                           padding=0,
-                           height=28,
-                           font=('Helvetica', 11))
-        
-        # Для всех кнопок в приложении
-        self.style.map('TButton',
-                     foreground=[('active', 'black')],
-                     background=[('active', '#e6e6e6')])
+    def refresh_table(self):
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+        for item in self.inventory.get_all_items():
+            self.tree.insert("", "end", values=item)
+
+    def delete_selected_item(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Attention", "Select the item to delete.")
+            return
+
+        confirm = messagebox.askyesno("Confirmation", "Delete the seleected product?")
+        if not confirm:
+            return
+
+        item_id = self.tree.item(selected[0])["values"][0]
+        try:
+            self.inventory.delete_item(item_id)
+            self.refresh_table()
+            messagebox.showinfo("Success", "The product has been deleted.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Couldn't delete the product: {e}")
+
+# точчка входа
+if __name__ == "__main__":
+    root = tk.Tk()
+    db = Database("inventory.db")
+    app = InventoryApp(root, db)
+    root.mainloop()

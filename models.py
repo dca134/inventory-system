@@ -1,5 +1,5 @@
 class Item:
-    """Класс товара"""
+    #Product class
     def __init__(self, id: int, name: str, quantity: int, price: float):
         self.id = id
         self.name = name
@@ -11,7 +11,7 @@ class Item:
 
 
 class Inventory:
-    """Класс инвентаря"""
+    #inventory Class
     def __init__(self):
         self.items = []
 
